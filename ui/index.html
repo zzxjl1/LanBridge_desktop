@@ -1,0 +1,821 @@
+<!doctype html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <title>LanBridge</title>
+    <link href="/materialdesignicons.min.css" rel="stylesheet">
+    <link href="/vuetify.min.css" rel="stylesheet">
+    <script src="/vue.js"></script>
+    <script src="/vuetify.js"></script>
+    <script src="/eel.js"></script>
+</head>
+<style>
+    * {
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+        -webkit-user-select: none;
+        user-select: none;
+        outline: none;
+    }
+
+    [v-cloak] {
+        display: none;
+    }
+
+    html,
+    body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0 auto;
+    }
+
+    ::-webkit-scrollbar {
+        display: none
+    }
+
+    .v-dialog {
+        overflow-x: hidden;
+    }
+
+    canvas {
+        display: block;
+        height: 100vh;
+        width: 100vw;
+        filter: blur(60px);
+        -webkit-filter: blur(60px);
+        z-index: -1;
+        position: fixed;
+        overflow: hidden;
+    }
+
+    #app {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 100vw;
+        background: transparent;
+    }
+
+    .myGroup-enter,
+    .myGroup-leave-to {
+        opacity: 0;
+        transform: translateY(80px);
+    }
+
+    .myGroup-enter-active,
+    .myGroup-leave-active {
+        transition: all 0.5s;
+    }
+
+    .myGroup-move {
+        transition: all 0.5s;
+    }
+
+    .myGroup-leave-active {
+        position: absolute;
+    }
+
+    @keyframes flicker {
+        from {
+            opacity: 1.0;
+        }
+
+        50% {
+            opacity: 0.4;
+        }
+
+        to {
+            opacity: 1.0;
+        }
+    }
+
+    @-webkit-keyframes flicker {
+        from {
+            opacity: 1.0;
+        }
+
+        50% {
+            opacity: 0.4;
+        }
+
+        to {
+            opacity: 1.0;
+        }
+    }
+
+    .flicker {
+        animation: flicker 800ms infinite;
+        -webkit-animation: flicker 800ms infinite;
+    }
+
+    @keyframes changecolor {
+        from {
+            color: green;
+        }
+
+        50% {
+            color: rgb(32, 198, 248);
+        }
+
+        to {
+            color: rgb(35, 59, 13);
+        }
+    }
+
+    @-webkit-keyframes changecolor {
+        from {
+            color: green;
+        }
+
+        50% {
+            color: rgb(32, 198, 248);
+        }
+
+        to {
+            color: rgb(35, 59, 13);
+        }
+    }
+
+    .running {
+        animation: changecolor 1500ms infinite;
+        -webkit-animation: changecolor 1500ms infinite;
+    }
+
+    .allowed{
+        background-color: #4caf50 !important;
+        color: aliceblue !important;
+    }
+</style>
+
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <div v-cloak id="app">
+        <v-app>
+            <v-main>
+
+
+                <v-snackbar :timeout="3000" v-model="snackbar_toggle" color="deep-purple accent-4" elevation="24">
+                    <span v-html="snackbar_text"></span>
+                    <template v-slot:action="{ attrs }">
+                        <v-btn text v-bind="attrs" @click="snackbar_toggle = false">
+                            关闭
+                        </v-btn>
+                    </template>
+                </v-snackbar>
+
+
+
+                <v-app-bar flat color="transparent">
+                    <v-app-bar-nav-icon @click="drawer = true"></v-app-bar-nav-icon>
+                    <v-toolbar-title>
+                        <span v-if="receving_pcm" class="flicker" style="display: flex;align-items: center;">
+                        <v-icon large color="orange darken-2">mdi-volume-high</v-icon>
+                        &nbsp;正在接收音频串流
+                        </span>
+                    </v-toolbar-title>
+                    <v-spacer></v-spacer>
+                    <div>
+                        <v-switch v-model="undisturb_mode_switch" label="勿扰模式" hide-details></v-switch>
+                    </div>
+                </v-app-bar>
+
+                <v-navigation-drawer v-model="drawer" absolute temporary>
+                    <v-list-item>
+                        <v-list-item-content>
+                            <v-list-item-title class="text-h6">
+                                LanBridge
+                            </v-list-item-title>
+                            <v-list-item-subtitle>
+                                跨平台多设备协同工具
+                            </v-list-item-subtitle>
+                        </v-list-item-content>
+                    </v-list-item>
+
+                    <v-divider></v-divider>
+
+                    <v-list nav dense>
+                        <v-list-item-group active-class="deep-purple--text text--accent-4">
+                            <v-list-item @click="show_about()">
+                                <v-list-item-icon>
+                                    <v-icon>mdi-help-box</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>关于</v-list-item-title>
+                            </v-list-item>
+                        </v-list-item-group>
+                    </v-list>
+                </v-navigation-drawer>
+
+
+
+
+
+
+
+                <v-container fluid>
+                    <v-row>
+                        <v-col align="center">
+                            <v-alert @click="show_sync_folder()" text color="info" min-width="200" max-width="300">
+                                <h3 class="text-h5">文件夹共享</h3>
+                                <div class="caption">
+                                    对该文件夹的操作会自动同步到其他机器
+                                </div>
+                            </v-alert>
+                        </v-col>
+                        <v-col align="center">
+                            <v-alert @click="toggle_clipboard_share_switch()" text color="success" min-width="200"
+                                max-width="300">
+                                <h3 class="text-h5">剪切板共享：{{clipboard_share_switch?"开":"关"}}</h3>
+                                <div class="caption">
+                                    在剪切板中的内容更新时向局域网广播
+                                </div>
+                            </v-alert>
+                        </v-col>
+                        <v-col align="center">
+                            <v-alert @click="toggle_soundwire_switch()" text color="warning" min-width="200"
+                                max-width="300">
+                                <h3 class="text-h5">
+                                    音频串流：{{soundwire_switch?"开":"关"}}
+                                </h3>
+                                <div class="caption">
+                                    向所有设备广播本机正在播放的音频/麦克风
+                                </div>
+                            </v-alert>
+                        </v-col>
+                    </v-row>
+                </v-container>
+
+
+
+
+
+
+                <v-card class="mx-auto" max-width="80%" v-if="Object.keys(clients_lan).length==0">
+
+                    <v-carousel :continuous="true" :cycle="true" :show-arrows="true" hide-delimiter-background
+                        show-arrows-on-hover delimiter-icon="mdi-minus" height="300">
+                        <v-carousel-item>
+                            <v-sheet color="green" height="100%" tile>
+                                <v-row class="fill-height" align="center" justify="center">
+                                    <div class="text-h2">
+                                        Slide1
+                                    </div>
+                                </v-row>
+                            </v-sheet>
+                        </v-carousel-item>
+                        <v-carousel-item>
+                            <v-sheet color="blue" height="100%" tile>
+                                <v-row class="fill-height" align="center" justify="center">
+                                    <div class="text-h2">
+                                        Slide2
+                                    </div>
+                                </v-row>
+                            </v-sheet>
+                        </v-carousel-item>
+                        <v-carousel-item>
+                            <v-sheet color="primary" height="100%" tile>
+                                <v-row class="fill-height" align="center" justify="center">
+                                    <div class="text-h2">
+                                        Slide3
+                                    </div>
+                                </v-row>
+                            </v-sheet>
+                        </v-carousel-item>
+                    </v-carousel>
+
+                    <v-list-item three-line>
+                        <v-list-item-avatar>
+                            <v-icon large color="primary">mdi-access-point-network</v-icon>
+                        </v-list-item-avatar>
+                        <v-list-item-content>
+                            <span class="text-h5 mb-1">
+                                当前暂无设备连接...
+                            </span>
+                            <br>
+                            <span>
+                                网络发现进行中，请打开其他设备上的LanBridge应用，并保证设备处于同一网络下。
+                            </span>
+                        </v-list-item-content>
+                    </v-list-item>
+
+                </v-card>
+
+
+
+
+
+
+
+
+
+                <v-container fluid>
+                    <v-row>
+                        <v-col v-for="(value, name) in clients_lan" :key="name">
+                            <transition-group appear name="myGroup">
+                                <v-card class="mx-auto" max-width="344" elevation="3" outlined
+                                    :loading="!value.ws_connected" :key="name">
+
+                                    <v-overlay :absolute=true :value="!value.ws_connected">
+                                        <v-alert type="error">
+                                            连接断开，正在重连。。。
+                                        </v-alert>
+                                    </v-overlay>
+
+
+                                    <v-app-bar dense elevation="0">
+                                        <v-spacer></v-spacer>
+
+                                        <v-tooltip bottom>
+                                        <template v-slot:activator="{ on, attrs }">
+                                        <v-btn elevation="2" fab small :disabled="!soundwire_switch"
+                                            v-bind:class="{ allowed: soundwire_switch&&soundwire_target.indexOf(name)!=-1 }"
+                                            v-bind="attrs" v-on="on"
+                                            v-on:click="toggle_soundwire_target(name)">
+                                            <v-icon>mdi-cast-audio</v-icon>
+                                        </v-btn>
+                                        </template>
+                                        <span>允许向此设备串流音频</span>
+                                        </v-tooltip>
+
+
+                                    
+                                    </v-app-bar>
+
+
+                                    <v-list-item three-line>
+                                        <v-list-item-content>
+                                            <div class="text-overline mb-4">
+                                                {{name}}
+                                            </div>
+
+                                            <v-list-item-title class="text-h5 mb-1"
+                                                @click="set_alias(value.sys_info.mac)">
+                                                {{get_alias(value.sys_info.mac,name)}}
+                                            </v-list-item-title>
+                                            <v-card-text>
+                                                {{value.sys_info.platform}}<br>
+                                                {{value.sys_info.mac}}<br>
+                                                {{generate_battery_str(value.battery)}}
+                                            </v-card-text>
+                                        </v-list-item-content>
+
+
+
+
+                                        <v-list-item-avatar tile size="80">
+
+                                            <img v-bind:src="'/img/os_logo/' +value.sys_info.system+ '.svg'">
+                                        </v-list-item-avatar>
+                                    </v-list-item>
+
+                                    <v-card-actions>
+                                        <v-btn v-on:click="ui_data[name].fullscreen_dialog_open=true;$forceUpdate()"
+                                            color="primary" elevation="2" large block>
+                                            展开 <v-icon right> mdi-open-in-new</v-icon>
+                                        </v-btn>
+                                    </v-card-actions>
+                                </v-card>
+                            </transition-group>
+
+                        </v-col>
+                    </v-row>
+                </v-container>
+
+
+
+
+
+
+
+
+                <v-dialog v-for="(value, name) in ui_data" :key="name" v-model="value.fullscreen_dialog_open" fullscreen
+                    hide-overlay transition="dialog-bottom-transition">
+                    <v-toolbar dark extended extension-height="10" color="primary">
+                        <v-btn icon dark @click="value.fullscreen_dialog_open = false;$forceUpdate()">
+                            <v-icon>mdi-close</v-icon>
+                        </v-btn>
+                        <v-toolbar-title>{{clients_lan[name].sys_info.hostname}} - {{name}}</v-toolbar-title>
+                    </v-toolbar>
+
+
+                    <v-card>
+
+                        <v-overlay :absolute=true :value="!clients_lan[name].ws_connected">
+                            <v-progress-circular indeterminate size="64"></v-progress-circular>
+                        </v-overlay>
+
+
+                        <v-row>
+                            <v-col cols="12" v-if="clients_lan[name].sys_info.system!='Android'">
+                                <v-card class="mx-auto" max-width="80%" elevation="2">
+                                    <v-card-title>访问远程文件</v-card-title>
+                                    <v-card-text>
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+
+                                    </v-card-text>
+                                    <v-card-actions>
+                                        <v-btn block @click="show_file_explorer(name)">
+                                            开始浏览
+                                        </v-btn>
+                                    </v-card-actions>
+                                </v-card>
+                            </v-col>
+                            <v-col cols="12" v-if="clients_lan[name].sys_info.system!='Android'">
+                                <v-card class="mx-auto" max-width="80%" elevation="2">
+
+                                    <v-overlay :absolute=true :value="get_host_os()=='Mac OS'" :opacity="0.7">
+                                        <h1 class="font-italic">not supported</h1>
+                                    </v-overlay>
+
+                                    <v-card-title>键鼠映射</v-card-title>
+                                    <v-card-text>
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                    </v-card-text>
+                                    <v-card-actions>
+                                        <v-btn block @click="start_keyboard_mouse_cast(name)">
+                                            运行
+                                        </v-btn>
+                                    </v-card-actions>
+                                </v-card>
+                            </v-col>
+                            <v-col cols="12">
+                                <v-card class="mx-auto" max-width="80%" elevation="2">
+                                    <v-card-title>发送文件</v-card-title>
+                                    <v-card-text>
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                    </v-card-text>
+                                    <v-card-actions>
+                                        <v-btn color="purple lighten-2" dark @click="send_file(name)">
+                                            <v-icon left>mdi-file </v-icon>选择文件/文件夹
+                                        </v-btn>
+                                    </v-card-actions>
+                                </v-card>
+                            </v-col>
+                            <v-col cols="12">
+                                <v-card class="mx-auto" max-width="80%" elevation="2">
+                                    <v-card-title>查找设备</v-card-title>
+                                    <v-card-text>
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                    </v-card-text>
+                                    <v-card-actions>
+                                        <v-btn color="green darken-2" dark @click="find_my_device(name)">
+                                            <v-icon left>mdi-cellphone-sound </v-icon>开始
+                                        </v-btn>
+                                    </v-card-actions>
+                                </v-card>
+                            </v-col>
+                            <v-col cols="12" v-if="clients_lan[name].sys_info.system!='Android'">
+                                <v-card class="mx-auto" max-width="80%" elevation="2">
+                                    <v-card-title>电源控制</v-card-title>
+                                    <v-card-text>
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                        文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案文案
+                                    </v-card-text>
+                                    <v-card-actions>
+                                        <v-btn color="error" @click="power_management(name,'shutdown')">
+                                            <v-icon left>mdi-power</v-icon>
+                                            关机
+                                        </v-btn>
+                                        <v-btn color="warning" @click="power_management(name,'restart')">
+                                            <v-icon left>mdi-power-cycle</v-icon>
+                                            重启
+                                        </v-btn>
+                                        <v-btn color="secondary" @click="power_management(name,'hibernate')">
+                                            <v-icon left>mdi-power-sleep</v-icon>
+                                            休眠
+                                        </v-btn>
+                                    </v-card-actions>
+                                </v-card>
+                            </v-col>
+                        </v-row>
+
+
+                        <v-overlay :value="keyboard_mouse_cast_dialog">
+                            <v-alert class="flicker" type="warning" prominent border="left">
+                                <div class="text-h6">
+                                    键鼠映射运行中，若要退出请同时按住键盘上的
+                                    <!-- 'w','u','f'-->
+                                    '<v-icon>mdi-alpha-w-box</v-icon>',
+                                    '<v-icon>mdi-alpha-u-box</v-icon>',
+                                    '<v-icon>mdi-alpha-f-box</v-icon>'
+                                    共3个键
+                                </div>
+                            </v-alert>
+                        </v-overlay>
+
+
+
+
+
+
+
+
+
+
+                    </v-card>
+                </v-dialog>
+
+            </v-main>
+        </v-app>
+    </div>
+
+
+    <script>
+        /*
+            async function py_heartbeat() {
+                pyheartbeattimer = setTimeout("clearTimeout(py_heartbeat_timer);window.close()", 500);
+                let n = await eel.ping()();
+                clearTimeout(pyheartbeattimer);
+            }
+        	
+            var py_heartbeat_timer = setInterval("py_heartbeat()", 1000);
+        */
+
+        function jsonParser(blob) {
+            let parsed = JSON.parse(blob);
+            if (typeof parsed === 'string') parsed = jsonParser(parsed);
+            return parsed;
+        }
+        eel.expose(set_receiving_pcm_state);
+        function set_receiving_pcm_state(t){
+            app.receving_pcm = t;
+        }
+        eel.expose(update_soundwire_target);
+        function update_soundwire_target(){
+            eel.get_soundwire_target()().then(t => {
+                let parsed = jsonParser(t);
+                app.soundwire_target = parsed;
+            });
+        }
+        eel.expose(update_all_lan_clients);
+        function update_all_lan_clients() {
+            eel.get_all_lan_clients()().then(t => {
+                temp = jsonParser(t);
+                app.clients_lan = temp;
+                for (var ip in temp) {
+                    if (!app.ui_data.hasOwnProperty(ip)) {
+                        app.ui_data[ip] = {
+                            "fullscreen_dialog_open": false,
+                        };
+                    }
+                }
+                app.$forceUpdate();
+            });
+        }
+        eel.expose(update_undisturb_mode_switch);
+        function update_undisturb_mode_switch() {
+            eel.is_undisturb_on()().then(t => {
+                app.undisturb_mode_switch = t;
+            });
+        }
+        eel.expose(update_soundwire_switch);
+        function update_soundwire_switch() {
+            eel.is_soundwire_running()().then(t => {
+                app.soundwire_switch = t;
+            });
+        }
+        eel.expose(update_clipboard_share_switch);
+        function update_clipboard_share_switch() {
+            eel.is_clipboard_share_running()().then(t => {
+                app.clipboard_share_switch = t;
+            });
+        }
+        eel.expose(keyboard_mouse_cast_stopped);
+        function keyboard_mouse_cast_stopped() {
+            app.keyboard_mouse_cast_dialog = false;
+        }
+
+        var app = new Vue({
+            el: '#app',
+            vuetify: new Vuetify(),
+            data: {
+                drawer: false,
+                undisturb_mode_switch: false,
+                keyboard_mouse_cast_dialog: false,
+                clients_lan: {},
+                ui_data: {},
+                clipboard_share_switch: false,
+                soundwire_switch: false,
+                snackbar_toggle: false,
+                snackbar_text: "欢迎使用",
+                soundwire_target: [],
+                receving_pcm: false,
+            },
+            watch: {
+                undisturb_mode_switch(val) {
+                    eel.toggle_undisturb_mode(val);
+                },
+                clipboard_share_switch(val) {
+                    eel.toggle_clipboard_share(val);
+                },
+
+            },
+            methods: {
+                toggle_soundwire_target: function (ip) {
+                    if (app.soundwire_target.indexOf(ip) == -1) {
+                        app.soundwire_target.push(ip);
+                    } else {
+                        app.soundwire_target.pop(ip);
+                    }
+                    var result = JSON.stringify(app.soundwire_target);
+                    eel.set_soundwire_target(result);
+                },
+                show_about: function () {
+                    this.drawer = false;
+                    this.show_snackbar("Made with 💙 by &nbsp;<strong>Wu_Eden</strong>");
+                },
+                show_snackbar: function (t) {
+                    this.snackbar_toggle = true;
+                    this.snackbar_text = t;
+                },
+                get_alias: function (mac, ip) {
+                    if (mac) {
+                        eel.get_alias(mac)().then(t => {
+                            //app.clipboard_share_switch = t;
+                            if (t) {
+                                app.clients_lan[ip]["sys_info"]["hostname"] = t;
+                            }
+                        });
+                    }
+                    return app.clients_lan[ip]["sys_info"]["hostname"];
+                },
+                set_alias: function (mac) {
+                    if (!mac) return;
+                    var t = prompt("请输入要指定的别名");
+                    eel.set_alias(mac, t);
+                    update_all_lan_clients();
+                },
+                get_host_os: function () {
+                    var userAgent = window.navigator.userAgent,
+                        platform = window.navigator.platform,
+                        macosPlatforms = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'],
+                        windowsPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'],
+                        iosPlatforms = ['iPhone', 'iPad', 'iPod'],
+                        os = null;
+
+                    if (macosPlatforms.indexOf(platform) !== -1) {
+                        os = 'Mac OS';
+                    } else if (iosPlatforms.indexOf(platform) !== -1) {
+                        os = 'iOS';
+                    } else if (windowsPlatforms.indexOf(platform) !== -1) {
+                        os = 'Windows';
+                    } else if (/Android/.test(userAgent)) {
+                        os = 'Android';
+                    } else if (!os && /Linux/.test(platform)) {
+                        os = 'Linux';
+                    }
+
+                    return os;
+                },
+                generate_battery_str: function (t) {
+                    if (!t.has_battery) return "电池未安装或不支持检测"
+                    return t.percentage + "% " + (t.is_charging ? "充电中" : "正使用电池")
+                },
+                show_file_explorer: function (ip) {
+                    eel.show_file_explorer(ip);
+                },
+                start_keyboard_mouse_cast: function (ip) {
+                    eel.start_keyboard_mouse_cast(ip);
+                    this.keyboard_mouse_cast_dialog = true;
+                },
+                show_sync_folder: function () {
+                    eel.show_sync_folder();
+                },
+                power_management: function (ip, action) {
+                    eel.power_management(ip, action);
+                },
+                toggle_soundwire_switch: function () {
+                    this.soundwire_switch = !this.soundwire_switch;
+                    if(this.soundwire_switch){
+                        this.show_snackbar("SoundWire总开关已开启，请打开目标设备卡片上方的分开关！");
+                    }else{
+                        this.show_snackbar("SoundWire总开关已关闭！");
+                    }
+                    eel.toggle_soundwire(this.soundwire_switch);
+                },
+                toggle_clipboard_share_switch: function () {
+                    this.clipboard_share_switch = !this.clipboard_share_switch;
+                    eel.toggle_clipboard_share(this.clipboard_share_switch);
+                },
+                send_file: function (ip) {
+                    eel.send_file(ip);
+                },
+                send_folder: function (ip) {
+                    eel.send_folder(ip);
+                },
+                find_my_device: function (ip) {
+                    eel.find_my_device(ip);
+                    this.show_snackbar("设备查找请求已发送！");
+                }
+
+
+            },
+            mounted() {
+                update_undisturb_mode_switch();
+                update_all_lan_clients();
+                update_soundwire_switch();
+                update_clipboard_share_switch();
+                update_soundwire_target();
+            }
+        });
+
+
+
+    </script>
+
+    <script>
+        var speed = 5;
+        var count = 10;
+        window.onload = function () {
+
+            const canvas = document.querySelector('canvas');
+            if (typeof canvas.getContext === 'undefined') {
+                return;
+            }
+            const ctx = canvas.getContext("2d");
+
+            function fitCanvasSize() {
+
+                canvas.width = document.documentElement.clientWidth;
+                canvas.height = document.documentElement.clientHeight;
+
+            }
+            fitCanvasSize();
+            window.onresize = fitCanvasSize;
+
+            var balls = [];
+
+            function rand(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            var Ball = function () {
+                this.r = rand(10, 30);
+                this.x = rand(0 + this.r, canvas.width - this.r);
+                this.y = rand(0 + this.r, canvas.height - this.r);
+                this.vx = rand(-speed, speed);
+                this.vy = rand(-speed, speed);
+                this.draw = function () {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                    ctx.fillStyle = "yellow";
+                    ctx.fill();
+                };
+                this.move = function () {
+                    if (this.x + this.r > canvas.width || this.x - this.r < 0) {
+                        this.vx *= -1;
+                    }
+                    if (this.y + this.r > canvas.height || this.y - this.r < 0) {
+                        this.vy *= -1;
+                    }
+                    this.x += this.vx;
+                    this.y += this.vy;
+                }
+            };
+
+            function density() {
+                var i;
+                for (i = 0; i < count; i++) {
+                    balls.push(new Ball);
+                }
+            };
+            density();
+
+            function update() {
+                var i;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (i = 0; i < count; i++) {
+                    balls[i].draw();
+                    balls[i].move();
+                }
+                setTimeout(function () {
+                    update();
+                }, 100)
+            };
+            update();
+        }
+    </script>
+</body>
+
+</html>

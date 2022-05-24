@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <link rel="shortcut icon" href="{{url_for('static', filename='/favicon.ico')}}" type="image/x-icon" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <meta name="generator" content="Bootstrap Listr">
+  <title>File Explorer</title>
+  <link rel="stylesheet" href="{{url_for('static', filename='css/listr.pack.css')}}">
+  <link rel="stylesheet" href="{{url_for('static', filename='css/jquery.filer.css')}}">
+  <script type="text/javascript" src="{{url_for('static', filename='js/iconfont.js')}}"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='js/jquery.min.js')}}"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='js/tether.min.js')}}"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.min.js')}}"></script>
+  </head>
+  <style>
+.icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+  </style>
+<body dir="ltr">
+  <div style="overflow:hidden">
+    <div class="row">
+      <div class="col-xs-12">
+        <ol class="breadcrumb" dir="ltr">
+            <a href="{{url_for('path_view')}}"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-home"></use></svg> </a>
+            {% for part in path.strip('/').split('/') if part%}
+			<svg class="icon" aria-hidden="true"><use xlink:href="#icon-right"></use></svg>
+            <a href="{{url_for('path_view', p=path[:path.find(part)+part|length]+'/')}}"><strong>{{ part }}</strong></a>
+            {% endfor %}
+        </ol>
+      </div>
+      <div class="col-xs-12 col-sm-5 col-md-4 col-sm-offset-7 col-md-offset-8 pull-sm-right">
+        <div class="form-group">
+            <label class="form-control-label sr-only" for="listr-search">搜索</label>
+            <input type="text" id="listr-search" class="form-control" placeholder="搜索">
+        </div>
+      </div>
+    </div>
+	
+    <div class="table-responsive">
+      <table id="listr-table" class="table table-hover">
+        <thead>
+          <tr>
+            <th class="text-xs-left " data-sort="string">名称</th>
+			<!--
+            <th class="text-xs-right " data-sort="int">大小</th>
+            <th class="text-xs-right " data-sort="int">上次修改时间</th>
+			-->
+          </tr>
+        </thead>
+        <tfoot>
+          <tr>
+            <td colspan="3">
+                <small class="pull-xs-left text-muted" dir="ltr">{{total.dir}} 个分区, 共{{total.size | size_fmt}}</small>
+            </td>
+          </tr>
+        </tfoot>
+        <tbody>
+          {% for entry in contents %}
+          <tr>
+            <td class="text-xs-left " data-sort-value="dir-{{entry.name | lower}}">
+			<svg class="icon" aria-hidden="true"><use xlink:href="#icon-disk"></use></svg>
+			&nbsp;<a href="/file_explorer/{{path}}{{entry.name}}/" ><strong>{{entry.name}}</strong></a></td>
+            <!--
+			<td class="text-xs-right " data-sort-value="-1">&mdash;</td>
+            <td class="text-xs-right " data-sort-value="{{entry.mtime}}" title="{{entry.mtime | time_fmt}}">{{entry.mtime | humanize}}</td>
+			-->
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+	  
+	  
+    </div>
+    <div class="modal fade modal-fullscreen" id="viewer-modal" tabindex="-1" role="dialog" aria-labelledby="file-name" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close pull-xs-right" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h4 class="modal-title text-left" id="file-name">&nbsp;</h4>
+            <small class="text-muted" id="file-meta"></small>
+          </div>
+          <div class="modal-body"></div>
+          <div class="modal-footer">
+            <div class="pull-xs-right">
+              
+              <div class="btn-group">
+                <a href="#" class="btn" download>下载</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="uploader-modal" tabindex="-1" role="dialog" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-body">
+            <form id="upload-files" method="post" enctype="multipart/form-data">
+                <input type="file" name="files[]" id="filer_input" multiple="multiple">
+            </form>
+          </div>
+          <div class="modal-footer">
+            <div class="pull-xs-right">
+              <button type="button" id="close-uploader" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+ 
+  <script type="text/javascript" src="{{url_for('static', filename='js/listr.pack.js')}}"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='js/jquery.filer.min.js')}}"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='js/jquery.base64.min.js')}}"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='js/custom.js')}}"></script>
+</body>
+</html>
+
+
+
+
+
+
+   

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <script src="/sweetalert2.js"></script>
+    <script src="/howler.min.js"></script>
+</head>
+<style>
+    @keyframes flicker {
+        from {
+            background: white;
+        }
+
+        50% {
+            background: black;
+        }
+
+        to {
+            background: white;
+        }
+    }
+
+    @-webkit-keyframes flicker {
+        from {
+            background: white;
+        }
+
+        50% {
+            background: black;
+        }
+
+        to {
+            background: white;
+        }
+    }
+
+    .flicker {
+        animation: flicker 500ms infinite;
+        -webkit-animation: flicker 500ms infinite;
+    }
+
+    .btn {
+        display: inline-block;
+        font-weight: normal;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: middle;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        border: 1px solid transparent;
+        margin: 0 0.5rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 1.5rem;
+        line-height: 1.25;
+        border-radius: 0.25rem;
+        transition: all 0.15s ease-in-out;
+    }
+
+    .btn-danger {
+        color: #fff;
+        background-color: #dc3545;
+        border-color: #dc3545;
+    }
+
+    .btn-danger:hover {
+        color: #fff;
+        background-color: #c82333;
+        border-color: #bd2130;
+    }
+</style>
+
+<body class="flicker">
+
+    <script>
+        let timerInterval
+        Swal.fire({
+            title: '正在发出提示音和闪光!',
+            html: '将在<b></b>秒后自动退出 <br>' + ' <br><button onclick="Swal.close()" class="btn btn-danger">' + '结束提醒' + '</button><br>',
+            timer: 30000,
+            timerProgressBar: true,
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading()
+                const b = Swal.getHtmlContainer().querySelector('b')
+                timerInterval = setInterval(() => {
+                    b.textContent = parseInt(Swal.getTimerLeft() / 1000)
+                }, 100)
+            },
+            willClose: () => {
+                clearInterval(timerInterval)
+            }
+        }).then((result) => {
+            sound.stop();
+            window.close();
+        })
+
+
+        var sound = new Howl({
+            src: ['ring.wav'],
+            autoplay: true,
+            loop: true
+        });
+    </script>
+</body>
+
+</html>
